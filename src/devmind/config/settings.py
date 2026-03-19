@@ -97,11 +97,18 @@ class Settings(BaseSettings):
     cache_enabled: bool = Field(default=True, description="Enable caching")
     cache_ttl: int = Field(default=3600, ge=0, description="Cache TTL in seconds")
 
-    @field_validator("data_dir", "cache_dir", "logs_dir", "db_path")
+    @field_validator("data_dir", "cache_dir", "logs_dir")
     @classmethod
     def create_dirs(cls, value: Path) -> Path:
         """Create directories if they don't exist."""
         value.mkdir(parents=True, exist_ok=True)
+        return value
+
+    @field_validator("db_path")
+    @classmethod
+    def create_db_dir(cls, value: Path) -> Path:
+        """Create parent directory for database if it doesn't exist."""
+        value.parent.mkdir(parents=True, exist_ok=True)
         return value
 
     @field_validator("llm_api_key")

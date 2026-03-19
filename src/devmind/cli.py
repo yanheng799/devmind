@@ -11,6 +11,25 @@ from devmind.agents.stock_agent import StockPredictionAgent
 from devmind.config import get_settings
 from devmind.models import NewsArticle, SourceType
 
+
+def json_serialize(obj: object) -> object:
+    """Custom JSON serializer for datetime and other types.
+
+    Args:
+        obj: Object to serialize
+
+    Returns:
+        JSON-serializable representation
+    """
+    if isinstance(obj, datetime):
+        return obj.isoformat()
+    elif hasattr(obj, "model_dump"):
+        return obj.model_dump()
+    elif hasattr(obj, "__dict__"):
+        return obj.__dict__
+    else:
+        return str(obj)
+
 # Setup logging
 logging.basicConfig(
     level=logging.INFO,
@@ -33,7 +52,7 @@ def cmd_predict(args: argparse.Namespace) -> int:
             if args.url:
                 # Predict from URL
                 result = agent.predict_from_url(args.url, args.stock)
-                print(json.dumps(result, ensure_ascii=False, indent=2))
+                print(json.dumps(result, ensure_ascii=False, indent=2, default=json_serialize))
 
             elif args.article:
                 # Predict from article text
@@ -48,14 +67,14 @@ def cmd_predict(args: argparse.Namespace) -> int:
                     related_stocks=[args.stock] if args.stock else [],
                 )
                 result = agent.predict_from_article(article, args.stock)
-                print(json.dumps(result, ensure_ascii=False, indent=2))
+                print(json.dumps(result, ensure_ascii=False, indent=2, default=json_serialize))
 
             else:
                 # Fetch and predict latest news
                 results = agent.fetch_and_predict_latest(limit=args.limit)
                 for i, result in enumerate(results):
                     print(f"\n=== Prediction {i + 1} ===")
-                    print(json.dumps(result, ensure_ascii=False, indent=2))
+                    print(json.dumps(result, ensure_ascii=False, indent=2, default=json_serialize))
 
         return 0
 

@@ -11,6 +11,11 @@ DevMind is an intelligent agent that analyzes international and domestic news to
 - **Historical Pattern Matching**: Vector-based retrieval of similar historical events
 - **Multi-factor Reasoning**: ReAct-based agent for decision making
 
+
+## 需求
+
+[需求文档](./docs/requirement-detailed.md)
+
 ## Architecture
 
 ![Architecture](news_stock_agent_architecture.svg)
