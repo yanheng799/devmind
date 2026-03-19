@@ -1,0 +1,192 @@
+# News sources configuration for DEVMIND
+# Defines available news sources for collecting A-share related news
+
+sources:
+  # Primary sources - Official announcements
+  - name: eastmoney
+    display_name: "东方财富网"
+    type: primary
+    enabled: true
+    priority: 1
+    urls:
+      base: "https://finance.eastmoney.com"
+      news_list: "https://finance.eastmoney.com/a/cjkx.html"
+    rate_limit:
+      requests_per_minute: 30
+      burst: 5
+    parser: eastmoney
+    coverage:
+      - market_overview
+      - sector_news
+      - company_announcements
+    reliability: high
+
+  - name: cnstock
+    display_name: "中国证券网"
+    type: primary
+    enabled: true
+    priority: 2
+    urls:
+      base: "https://www.cnstock.com"
+    rate_limit:
+      requests_per_minute: 20
+      burst: 3
+    parser: generic
+    coverage:
+      - company_announcements
+      - regulatory_news
+    reliability: high
+
+  # Secondary sources - News outlets
+  - name: tonghuashun
+    display_name: "同花顺"
+    type: secondary
+    enabled: true
+    priority: 3
+    urls:
+      base: "https://news.10jqka.com.cn"
+    rate_limit:
+      requests_per_minute: 25
+      burst: 4
+    parser: generic
+    coverage:
+      - market_overview
+      - stock_news
+      - fast_news
+    reliability: medium
+
+  - name: xinhua
+    display_name: "新华财经"
+    type: secondary
+    enabled: true
+    priority: 4
+    urls:
+      base: "http://www.xinhua08.com"
+    rate_limit:
+      requests_per_minute: 15
+      burst: 3
+    parser: generic
+    coverage:
+      - macro_economy
+      - policy_news
+      - industry_analysis
+    reliability: high
+
+  - name: wallstreetcn
+    display_name: "华尔街见闻"
+    type: secondary
+    enabled: true
+    priority: 5
+    urls:
+      base: "https://wallstreetcn.com"
+    rate_limit:
+      requests_per_minute: 10
+      burst: 2
+    parser: generic
+    coverage:
+      - global_markets
+      - macro_economy
+      - geopolicy
+    reliability: medium
+
+  - name: yicai
+    display_name: "第一财经"
+    type: secondary
+    enabled: true
+    priority: 6
+    urls:
+      base: "https://www.yicai.com"
+    rate_limit:
+      requests_per_minute: 20
+      burst: 3
+    parser: generic
+    coverage:
+      - company_news
+      - industry_analysis
+      - market_commentary
+    reliability: medium
+
+  # Regulatory sources
+  - name: pbc
+    display_name: "中国人民银行"
+    type: primary
+    enabled: true
+    priority: 1
+    urls:
+      base: "http://www.pbc.gov.cn"
+    rate_limit:
+      requests_per_minute: 10
+      burst: 2
+    parser: generic
+    coverage:
+      - monetary_policy
+      - financial_regulation
+    reliability: high
+
+  - name: csrc
+    display_name: "证监会"
+    type: primary
+    enabled: true
+    priority: 1
+    urls:
+      base: "http://www.csrc.gov.cn"
+    rate_limit:
+      requests_per_minute: 10
+      burst: 2
+    parser: generic
+    coverage:
+      - securities_regulation
+      - market_rules
+    reliability: high
+
+# Stock sector mappings for news categorization
+sectors:
+  banking:
+    keywords: ["银行", "金融", "利率", "存款", "贷款", "货币政策"]
+    stock_codes: ["600000.SH", "601398.SH", "601939.SH", "601988.SH"]
+
+  technology:
+    keywords: ["科技", "半导体", "芯片", "人工智能", "云计算", "5G"]
+    stock_codes: ["600584.SH", "002415.SZ", "300750.SZ"]
+
+  energy:
+    keywords: ["能源", "电力", "新能源", "光伏", "风电", "储能"]
+    stock_codes: ["600905.SH", "601877.SH", "300274.SZ"]
+
+  consumer:
+    keywords: ["消费", "零售", "白酒", "食品", "家电"]
+    stock_codes: ["600519.SH", "000858.SZ", "000333.SZ"]
+
+  healthcare:
+    keywords: ["医药", "医疗", "生物", "疫苗", "创新药"]
+    stock_codes: ["000001.SZ", "600276.SH", "300015.SZ"]
+
+  real_estate:
+    keywords: ["房地产", "地产", "住房", "房价", "房企"]
+    stock_codes: ["000002.SZ", "600048.SH", "001979.SZ"]
+
+# Event type patterns for classification
+event_patterns:
+  monetary_policy:
+    keywords: ["降息", "加息", "降准", "MLF", "LPR", "存款准备金"]
+    entities: ["央行", "人民银行", "PBC"]
+
+  fiscal_policy:
+    keywords: ["减税", "财政政策", "专项债", "国债", "财政赤字"]
+    entities: ["财政部", "发改委"]
+
+  earnings:
+    keywords: ["财报", "业绩", "净利润", "营收", "EPS", "季报", "年报"]
+    entities: ["公司", "股份"]
+
+  geopolitical:
+    keywords: ["贸易战", "制裁", "关税", "地缘", "外交"]
+    entities: ["美国", "欧盟", "日本", "韩国"]
+
+  regulatory:
+    keywords: ["监管", "处罚", "整顿", "规范", "办法", "规定"]
+    entities: ["证监会", "银保监会", "交易所"]
+
+  industry:
+    keywords: ["行业", "板块", "产业链", "供需"]
+    entities: ["协会", "联合会"]
