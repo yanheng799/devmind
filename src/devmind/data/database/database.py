@@ -172,6 +172,40 @@ class PredictionDatabase:
             )
         """)
 
+        # Documents table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS documents (
+                document_id TEXT PRIMARY KEY,
+                filename TEXT NOT NULL,
+                file_path TEXT NOT NULL UNIQUE,
+                file_type TEXT NOT NULL,
+                file_size INTEGER NOT NULL,
+                title TEXT,
+                author TEXT,
+                checksum TEXT NOT NULL,
+                upload_time TIMESTAMP NOT NULL,
+                last_modified TIMESTAMP NOT NULL,
+                chunk_count INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'processing',
+                metadata TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+
+        # Document chunks table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS document_chunks (
+                chunk_id TEXT PRIMARY KEY,
+                document_id TEXT NOT NULL,
+                chunk_index INTEGER NOT NULL,
+                content TEXT NOT NULL,
+                embedding_id TEXT,
+                page_number INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (document_id) REFERENCES documents(document_id) ON DELETE CASCADE
+            )
+        """)
+
         # Create indexes for better query performance
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_news_articles_publish_time
@@ -212,6 +246,28 @@ class PredictionDatabase:
         cursor.execute("""
             CREATE INDEX IF NOT EXISTS idx_historical_events_event_type
             ON historical_events(event_type)
+        """)
+
+        # Document indexes
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_documents_file_type
+            ON documents(file_type)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_documents_upload_time
+            ON documents(upload_time DESC)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_documents_checksum
+            ON documents(checksum)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_document_chunks_document_id
+            ON document_chunks(document_id)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_document_chunks_embedding_id
+            ON document_chunks(embedding_id)
         """)
 
         conn.commit()
@@ -661,3 +717,264 @@ class PredictionDatabase:
         """, (stock_code,))
         row = cursor.fetchone()
         return dict(row) if row else None
+
+    # Document operations
+    def insert_document(self, document: dict[str, Any]) -> str:
+        """Insert a document.
+
+        Args:
+            document: Document data dict
+
+        Returns:
+            The document_id
+        """
+        import json
+
+        cursor = self.connection.cursor()
+        cursor.execute("""
+            INSERT OR REPLACE INTO documents
+            (document_id, filename, file_path, file_type, file_size, title,
+             author, checksum, upload_time, last_modified, chunk_count, status, metadata)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """, (
+            document["document_id"],
+            document["filename"],
+            document["file_path"],
+            document["file_type"],
+            document["file_size"],
+            document.get("title"),
+            document.get("author"),
+            document["checksum"],
+            document["upload_time"],
+            document["last_modified"],
+            document.get("chunk_count", 0),
+            document.get("status", "processing"),
+            json.dumps(document.get("metadata", {})),
+        ))
+        self.connection.commit()
+        return document["document_id"]
+
+    def get_document(self, document_id: str) -> dict[str, Any] | None:
+        """Get a document by ID.
+
+        Args:
+            document_id: Document ID
+
+        Returns:
+            Document dict or None if not found
+        """
+        import json
+
+        cursor = self.connection.cursor()
+        cursor.execute(
+            "SELECT * FROM documents WHERE document_id = ?",
+            (document_id,),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        doc = dict(row)
+        doc["metadata"] = json.loads(doc.get("metadata", "{}"))
+        return doc
+
+    def get_document_by_checksum(self, checksum: str) -> dict[str, Any] | None:
+        """Get a document by checksum.
+
+        Args:
+            checksum: SHA256 checksum
+
+        Returns:
+            Document dict or None if not found
+        """
+        import json
+
+        cursor = self.connection.cursor()
+        cursor.execute(
+            "SELECT * FROM documents WHERE checksum = ?",
+            (checksum,),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        doc = dict(row)
+        doc["metadata"] = json.loads(doc.get("metadata", "{}"))
+        return doc
+
+    def list_documents(
+        self,
+        file_type: str | None = None,
+        status: str | None = None,
+        limit: int = 100,
+    ) -> list[dict[str, Any]]:
+        """List documents with optional filters.
+
+        Args:
+            file_type: Filter by file type
+            status: Filter by status
+            limit: Maximum number of documents
+
+        Returns:
+            List of document dicts
+        """
+        import json
+
+        query = "SELECT * FROM documents WHERE 1=1"
+        params: list[Any] = []
+
+        if file_type:
+            query += " AND file_type = ?"
+            params.append(file_type)
+        if status:
+            query += " AND status = ?"
+            params.append(status)
+
+        query += " ORDER BY upload_time DESC LIMIT ?"
+        params.append(limit)
+
+        cursor = self.connection.cursor()
+        cursor.execute(query, params)
+        rows = cursor.fetchall()
+        docs = []
+        for row in rows:
+            doc = dict(row)
+            doc["metadata"] = json.loads(doc.get("metadata", "{}"))
+            docs.append(doc)
+        return docs
+
+    def update_document_status(
+        self,
+        document_id: str,
+        status: str,
+        chunk_count: int | None = None,
+    ) -> None:
+        """Update document status.
+
+        Args:
+            document_id: Document ID
+            status: New status
+            chunk_count: Optional chunk count update
+        """
+        if chunk_count is not None:
+            cursor = self.connection.cursor()
+            cursor.execute("""
+                UPDATE documents
+                SET status = ?, chunk_count = ?
+                WHERE document_id = ?
+            """, (status, chunk_count, document_id))
+        else:
+            cursor = self.connection.cursor()
+            cursor.execute("""
+                UPDATE documents
+                SET status = ?
+                WHERE document_id = ?
+            """, (status, document_id))
+        self.connection.commit()
+
+    def delete_document(self, document_id: str) -> None:
+        """Delete a document and its chunks.
+
+        Args:
+            document_id: Document ID
+        """
+        cursor = self.connection.cursor()
+        cursor.execute(
+            "DELETE FROM document_chunks WHERE document_id = ?",
+            (document_id,),
+        )
+        cursor.execute(
+            "DELETE FROM documents WHERE document_id = ?",
+            (document_id,),
+        )
+        self.connection.commit()
+
+    # Document chunk operations
+    def insert_chunk(self, chunk: dict[str, Any]) -> str:
+        """Insert a document chunk.
+
+        Args:
+            chunk: Chunk data dict
+
+        Returns:
+            The chunk_id
+        """
+        cursor = self.connection.cursor()
+        cursor.execute("""
+            INSERT OR REPLACE INTO document_chunks
+            (chunk_id, document_id, chunk_index, content, embedding_id, page_number)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            chunk["chunk_id"],
+            chunk["document_id"],
+            chunk["chunk_index"],
+            chunk["content"],
+            chunk.get("embedding_id"),
+            chunk.get("page_number"),
+        ))
+        self.connection.commit()
+        return chunk["chunk_id"]
+
+    def get_chunks_by_document(self, document_id: str) -> list[dict[str, Any]]:
+        """Get all chunks for a document.
+
+        Args:
+            document_id: Document ID
+
+        Returns:
+            List of chunk dicts
+        """
+        cursor = self.connection.cursor()
+        cursor.execute("""
+            SELECT * FROM document_chunks
+            WHERE document_id = ?
+            ORDER BY chunk_index ASC
+        """, (document_id,))
+        return [dict(row) for row in cursor.fetchall()]
+
+    def get_chunk_by_embedding_id(self, embedding_id: str) -> dict[str, Any] | None:
+        """Get a chunk by embedding ID.
+
+        Args:
+            embedding_id: Embedding ID
+
+        Returns:
+            Chunk dict or None if not found
+        """
+        cursor = self.connection.cursor()
+        cursor.execute(
+            "SELECT * FROM document_chunks WHERE embedding_id = ?",
+            (embedding_id,),
+        )
+        row = cursor.fetchone()
+        return dict(row) if row else None
+
+    def update_chunk_embedding_id(
+        self,
+        chunk_id: str,
+        embedding_id: str,
+    ) -> None:
+        """Update chunk embedding ID.
+
+        Args:
+            chunk_id: Chunk ID
+            embedding_id: Embedding ID
+        """
+        cursor = self.connection.cursor()
+        cursor.execute("""
+            UPDATE document_chunks
+            SET embedding_id = ?
+            WHERE chunk_id = ?
+        """, (embedding_id, chunk_id))
+        self.connection.commit()
+
+    def delete_chunks_by_document(self, document_id: str) -> None:
+        """Delete all chunks for a document.
+
+        Args:
+            document_id: Document ID
+        """
+        cursor = self.connection.cursor()
+        cursor.execute(
+            "DELETE FROM document_chunks WHERE document_id = ?",
+            (document_id,),
+        )
+        self.connection.commit()

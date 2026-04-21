@@ -38,10 +38,17 @@ class Settings(BaseSettings):
     llm_timeout: int = Field(default=120, ge=1, description="LLM request timeout in seconds")
 
     # Embedding settings
-    embedding_model: str = Field(default="text2vec-base-chinese", description="Embedding model name")
-    embedding_device: str = Field(default="cpu", description="Embedding device: cpu or cuda")
+    embedding_provider: str = Field(default="dashscope", description="Embedding provider: dashscope, local")
+    embedding_model: str = Field(default="text-embedding-v4", description="Embedding model name")
+    embedding_device: str = Field(default="cpu", description="Embedding device: cpu or cuda (for local)")
     embedding_batch_size: int = Field(default=32, ge=1, description="Embedding batch size")
-    embedding_dim: int = Field(default=768, ge=1, description="Embedding dimension")
+    embedding_dim: int = Field(default=1024, ge=1, description="Embedding dimension")
+    embedding_api_key: str = Field(default="", description="DashScope API key for embeddings")
+    embedding_api_base: str = Field(
+        default="https://dashscope.aliyuncs.com/compatible-mode/v1",
+        description="DashScope API base URL",
+    )
+    embedding_timeout: int = Field(default=60, ge=1, description="Embedding request timeout in seconds")
 
     # Milvus settings
     milvus_host: str = Field(default="localhost", description="Milvus host")
@@ -97,7 +104,29 @@ class Settings(BaseSettings):
     cache_enabled: bool = Field(default=True, description="Enable caching")
     cache_ttl: int = Field(default=3600, ge=0, description="Cache TTL in seconds")
 
-    @field_validator("data_dir", "cache_dir", "logs_dir")
+    # Document processing settings
+    doc_upload_dir: Path = Field(
+        default_factory=lambda: Path(__file__).parent.parent.parent.parent / "data" / "documents",
+        description="Default document upload directory",
+    )
+    doc_chunk_size: int = Field(default=500, ge=100, description="Chunk size for documents")
+    doc_chunk_overlap: int = Field(default=50, ge=0, description="Overlap between chunks")
+    doc_watch_enabled: bool = Field(default=False, description="Enable directory watching")
+    doc_supported_formats: list[str] = Field(
+        default=["txt", "md", "pdf", "docx"],
+        description="Supported document formats",
+    )
+    doc_max_file_size: int = Field(
+        default=50 * 1024 * 1024,
+        ge=1,
+        description="Maximum file size in bytes (default 50MB)",
+    )
+    doc_collection_name: str = Field(
+        default="devmind_documents",
+        description="Milvus collection name for documents",
+    )
+
+    @field_validator("data_dir", "cache_dir", "logs_dir", "doc_upload_dir")
     @classmethod
     def create_dirs(cls, value: Path) -> Path:
         """Create directories if they don't exist."""
@@ -149,10 +178,26 @@ class Settings(BaseSettings):
     def get_embedding_config(self) -> dict[str, Any]:
         """Get embedding configuration dict."""
         return {
+            "provider": self.embedding_provider,
             "model_name": self.embedding_model,
             "device": self.embedding_device,
             "batch_size": self.embedding_batch_size,
             "dim": self.embedding_dim,
+            "api_key": self.embedding_api_key,
+            "api_base": self.embedding_api_base,
+            "timeout": self.embedding_timeout,
+        }
+
+    def get_document_config(self) -> dict[str, Any]:
+        """Get document processing configuration dict."""
+        return {
+            "upload_dir": str(self.doc_upload_dir),
+            "chunk_size": self.doc_chunk_size,
+            "chunk_overlap": self.doc_chunk_overlap,
+            "watch_enabled": self.doc_watch_enabled,
+            "supported_formats": self.doc_supported_formats,
+            "max_file_size": self.doc_max_file_size,
+            "collection_name": self.doc_collection_name,
         }
 
 

@@ -6,6 +6,11 @@ from devmind.models.base import (
     NewsArticle,
     SentimentAnalysis,
 )
+from devmind.models.document import (
+    Document,
+    DocumentChunk,
+    DocumentSearchResult,
+)
 from devmind.models.market import (
     FinancialReport,
     IndustryRelation,
@@ -34,6 +39,10 @@ __all__ = [
     "ExtractedEvent",
     "SentimentAnalysis",
     "HistoricalEvent",
+    # Document models
+    "Document",
+    "DocumentChunk",
+    "DocumentSearchResult",
     # Market models
     "StockPrice",
     "StockInfo",

@@ -1,5 +1,6 @@
 """Milvus vector store for event similarity search."""
 
+import logging
 from typing import Any
 
 from pymilvus import (
@@ -14,6 +15,9 @@ from pymilvus import (
 from devmind.config import get_settings
 
 
+logger = logging.getLogger(__name__)
+
+
 class MilvusVectorStore:
     """Vector store using Milvus for event similarity search.
 
@@ -21,8 +25,33 @@ class MilvusVectorStore:
     using embedding vectors.
     """
 
-    # Dimension of text2vec-base-chinese embeddings
-    EMBEDDING_DIM = 768
+    def __init__(
+        self,
+        collection_name: str | None = None,
+        host: str | None = None,
+        port: int | None = None,
+        embedding_dim: int | None = None,
+    ) -> None:
+        """Initialize the vector store.
+
+        Args:
+            collection_name: Name of the Milvus collection
+            host: Milvus host
+            port: Milvus port
+            embedding_dim: Embedding dimension (from settings if None)
+        """
+        settings = get_settings()
+        config = settings.get_embedding_config()
+
+        self.EMBEDDING_DIM = embedding_dim or config.get("dim", 1024)
+
+        self.collection_name = collection_name or settings.milvus_collection_name
+        self.host = host or settings.milvus_host
+        self.port = port or settings.milvus_port
+
+        # Connect to Milvus
+        self._connect()
+        self._collection: Collection | None = None
 
     def __init__(
         self,
@@ -238,8 +267,16 @@ class MockVectorStore(MilvusVectorStore):
     Uses simple in-memory storage instead of Milvus.
     """
 
-    def __init__(self) -> None:
-        """Initialize mock vector store."""
+    def __init__(self, embedding_dim: int | None = None) -> None:
+        """Initialize mock vector store.
+
+        Args:
+            embedding_dim: Embedding dimension
+        """
+        settings = get_settings()
+        config = settings.get_embedding_config()
+
+        self.EMBEDDING_DIM = embedding_dim or config.get("dim", 1024)
         self._events: dict[str, dict[str, Any]] = {}
 
     def insert_event(
@@ -392,10 +429,14 @@ class MockEmbeddingModel(EmbeddingModel):
     def __init__(self) -> None:
         """Initialize mock embedding model."""
         import hashlib
+
         import numpy as np
 
+        settings = get_settings()
+        config = settings.get_embedding_config()
+
         self._hash_func = hashlib.md5
-        self._dim = MilvusVectorStore.EMBEDDING_DIM
+        self._dim = config.get("dim", 1024)
 
     def embed(self, texts: list[str] | str) -> list[list[float]] | list[float]:
         """Generate mock embeddings."""
@@ -423,3 +464,192 @@ class MockEmbeddingModel(EmbeddingModel):
         if single_input:
             return embeddings[0]
         return embeddings
+
+
+class APIDashScopeEmbeddingModel(EmbeddingModel):
+    """API-based embedding model using DashScope text-embedding-v4.
+
+    Uses Alibaba DashScope API for generating embeddings.
+    """
+
+    DEFAULT_DIM = 1024
+
+    def __init__(
+        self,
+        api_key: str | None = None,
+        api_base: str | None = None,
+        model: str | None = None,
+        timeout: int | None = None,
+    ) -> None:
+        """Initialize the DashScope embedding model.
+
+        Args:
+            api_key: DashScope API key
+            api_base: API base URL
+            model: Model name
+            timeout: Request timeout in seconds
+        """
+        settings = get_settings()
+        config = settings.get_embedding_config()
+
+        self.api_key = api_key or config.get("api_key", "")
+        self.api_base = (
+            api_base
+            or config.get("api_base")
+            or "https://dashscope.aliyuncs.com/compatible-mode/v1"
+        )
+        self.model = model or config.get("model_name", "text-embedding-v4")
+        self.timeout = timeout or config.get("timeout", 60)
+        self.dim = config.get("dim", self.DEFAULT_DIM)
+
+        if not self.api_key:
+            raise ValueError(
+                "DashScope API key is required. "
+                "Set DEVMIND_EMBEDDING_API_KEY in your environment or .env file."
+            )
+
+        self._session: Any = None
+
+    def _get_session(self) -> Any:
+        """Get or create HTTP session."""
+        if self._session is None:
+            import requests
+            self._session = requests.Session()
+        return self._session
+
+    def embed(self, texts: list[str] | str) -> list[list[float]] | list[float]:
+        """Generate embeddings for texts.
+
+        Args:
+            texts: Single text or list of texts
+
+        Returns:
+            Embedding vector or list of vectors
+        """
+        import requests
+
+        session = self._get_session()
+
+        single_input = isinstance(texts, str)
+        if single_input:
+            texts = [texts]
+
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json",
+        }
+
+        data = {
+            "model": self.model,
+            "input": texts,
+            "encoding_format": "float",
+        }
+
+        try:
+            response = session.post(
+                f"{self.api_base}/embeddings",
+                headers=headers,
+                json=data,
+                timeout=self.timeout,
+            )
+            response.raise_for_status()
+
+            result = response.json()
+            embeddings = [item["embedding"] for item in result["data"]]
+
+            if single_input:
+                return embeddings[0]
+            return embeddings
+
+        except requests.RequestException as e:
+            logger.error(f"DashScope API request failed: {e}")
+            raise
+        except (KeyError, IndexError) as e:
+            logger.error(f"Failed to parse API response: {e}")
+            raise
+
+    def embed_single(self, text: str) -> list[float]:
+        """Generate embedding for a single text.
+
+        Args:
+            text: Input text
+
+        Returns:
+            Embedding vector
+        """
+        return self.embed(text)
+
+    def close(self) -> None:
+        """Close HTTP session."""
+        if self._session is not None:
+            self._session.close()
+            self._session = None
+
+
+class MockAPIDashScopeEmbeddingModel(APIDashScopeEmbeddingModel):
+    """Mock DashScope embedding model for testing.
+
+    Returns deterministic embeddings without API calls.
+    """
+
+    def __init__(self) -> None:
+        """Initialize mock embedding model."""
+        self.api_key = "mock_key"
+        self.api_base = "http://mock"
+        self.model = "text-embedding-v4"
+        self.timeout = 60
+        self.dim = APIDashScopeEmbeddingModel.DEFAULT_DIM
+        self._session = None
+
+    def embed(self, texts: list[str] | str) -> list[list[float]] | list[float]:
+        """Generate mock embeddings."""
+        import hashlib
+
+        import numpy as np
+
+        single_input = isinstance(texts, str)
+        if single_input:
+            texts = [texts]
+
+        embeddings: list[list[float]] = []
+        for text in texts:
+            hash_bytes = hashlib.md5(text.encode()).digest()
+            arr = np.frombuffer(hash_bytes, dtype=np.uint8).astype(np.float32)
+
+            if len(arr) < self.dim:
+                arr = np.pad(arr, (0, self.dim - len(arr)))
+            else:
+                arr = arr[:self.dim]
+
+            arr = arr / (np.linalg.norm(arr) + 1e-8)
+            embeddings.append(arr.tolist())
+
+        if single_input:
+            return embeddings[0]
+        return embeddings
+
+    def close(self) -> None:
+        """No-op for mock."""
+        pass
+
+
+def get_embedding_model(use_mock: bool = False, use_api: bool = True) -> EmbeddingModel | APIDashScopeEmbeddingModel:
+    """Get appropriate embedding model based on settings.
+
+    Args:
+        use_mock: Use mock model for testing
+        use_api: Use API-based model (DashScope) or local model
+
+    Returns:
+        Embedding model instance
+    """
+    settings = get_settings()
+    config = settings.get_embedding_config()
+
+    if use_mock:
+        return MockAPIDashScopeEmbeddingModel()
+
+    if use_api or config.get("provider") == "dashscope":
+        return APIDashScopeEmbeddingModel()
+    else:
+        return EmbeddingModel()

@@ -12,6 +12,7 @@
 import json
 import re
 import os
+import sys
 import pdfplumber
 from pathlib import Path
 from datetime import datetime
@@ -30,6 +31,11 @@ DRAW_TABLE_BBOXES = True             # 在图片上用彩色矩形标记检测�
 
 # 第1-7页左右分栏设置
 SPLIT_PAGE_RANGE = (1, 7)
+
+# 图表元素提取设置
+MIN_ELEMENT_WIDTH = 50    # 最小宽度(points)，过滤小图标/LOGO
+MIN_ELEMENT_HEIGHT = 50   # 最小高度(points)
+CROP_PADDING = 3          # 裁剪留白(points)
 
 PROJECT_META = {
     "project":    "甘肃～浙江±800千伏特高压直流输电工程线路工程",
@@ -309,6 +315,64 @@ def rows_to_markdown(rows):
     return "\n".join(lines)
 
 
+def _clamp_bbox(bbox, padding, page_bbox):
+    """给 bbox 添加 padding，并限制在页面 bbox 内。
+
+    page_bbox: (x0, top, x1, bottom) — 对于 CroppedPage 是裁剪区域坐标
+    """
+    return (
+        max(page_bbox[0], bbox[0] - padding),
+        max(page_bbox[1], bbox[1] - padding),
+        min(page_bbox[2], bbox[2] + padding),
+        min(page_bbox[3], bbox[3] + padding),
+    )
+
+
+def extract_page_elements(page, prefix, out_dir, resolution=TABLE_IMAGE_DPI):
+    """从页面中提取所有表格和图片，分别保存为单独 PNG。
+
+    prefix: 文件名前缀，如 "page_003_left"
+    返回 [{"type": "table"|"figure", "path": str}]
+    """
+    image_dir = out_dir / "images"
+    image_dir.mkdir(parents=True, exist_ok=True)
+
+    elements = []
+
+    # 提取表格
+    page_bbox = page.bbox
+    for i, table in enumerate(page.find_tables()):
+        bbox = table.bbox
+        if (bbox[2] - bbox[0]) < MIN_ELEMENT_WIDTH or (bbox[3] - bbox[1]) < MIN_ELEMENT_HEIGHT:
+            continue
+
+        filename = f"{prefix}_table_{i + 1:02d}.png"
+        img_path = image_dir / filename
+        if not img_path.exists():
+            padded = _clamp_bbox(bbox, CROP_PADDING, page_bbox)
+            cropped = page.crop(padded)
+            img = cropped.to_image(resolution=resolution)
+            img.save(img_path, format="PNG", quantize=False)
+        elements.append({"type": "table", "path": str(img_path.relative_to(out_dir))})
+
+    # 提取嵌入图片（图）
+    for i, img_obj in enumerate(page.images):
+        bbox = (img_obj["x0"], img_obj["top"], img_obj["x1"], img_obj["bottom"])
+        if (bbox[2] - bbox[0]) < MIN_ELEMENT_WIDTH or (bbox[3] - bbox[1]) < MIN_ELEMENT_HEIGHT:
+            continue
+
+        filename = f"{prefix}_fig_{i + 1:02d}.png"
+        img_path = image_dir / filename
+        if not img_path.exists():
+            padded = _clamp_bbox(bbox, CROP_PADDING, page_bbox)
+            cropped = page.crop(padded)
+            img = cropped.to_image(resolution=resolution)
+            img.save(img_path, format="PNG", quantize=False)
+        elements.append({"type": "figure", "path": str(img_path.relative_to(out_dir))})
+
+    return elements
+
+
 def save_table_page_images(pdf, page_indices, out_dir,
                            resolution=TABLE_IMAGE_DPI, draw_bboxes=DRAW_TABLE_BBOXES):
     """渲染表格页面为 PNG 图片，每页一张。返回相对路径列表（相对于 out_dir）。"""
@@ -353,7 +417,7 @@ def extract_split_page(pdf, page_num, out_dir, resolution=TABLE_IMAGE_DPI):
         ("right", (mid_x, 0, page.width, page.height)),
     ]
 
-    result = {"left_text": "", "right_text": "", "images": []}
+    result = {"left_text": "", "right_text": "", "images": [], "elements": []}
     image_dir = out_dir / "images"
     image_dir.mkdir(parents=True, exist_ok=True)
 
@@ -368,6 +432,11 @@ def extract_split_page(pdf, page_num, out_dir, resolution=TABLE_IMAGE_DPI):
             img = cropped.to_image(resolution=resolution)
             img.save(img_path, format="PNG", quantize=False)
         result["images"].append(str(img_path.relative_to(out_dir)))
+
+        # 提取该半页中的图表元素
+        prefix = f"page_{page_num:03d}_{side}"
+        elems = extract_page_elements(cropped, prefix, out_dir, resolution)
+        result["elements"].extend(elems)
 
     return result
 
@@ -418,6 +487,7 @@ def main():
             cid = chunk_def["id"]
             pages = chunk_def["pages"]
             all_images = []
+            all_elements = []
             text_parts = []
 
             for pg_num in pages:
@@ -426,10 +496,14 @@ def main():
                     text_parts.append(f"[第{pg_num}页-左]\n{sp['left_text']}")
                     text_parts.append(f"[第{pg_num}页-右]\n{sp['right_text']}")
                     all_images.extend(sp["images"])
+                    all_elements.extend(sp["elements"])
                 else:
                     page = pdf.pages[pg_num - 1]
                     text = page.extract_text() or ""
                     text_parts.append(f"[第{pg_num}页]\n{text}")
+                    prefix = f"page_{pg_num:03d}"
+                    elems = extract_page_elements(page, prefix, OUT_DIR)
+                    all_elements.extend(elems)
 
             text = "\n\n".join(text_parts)
 
@@ -445,6 +519,8 @@ def main():
             }
             if all_images:
                 metadata["split_page_images"] = all_images
+            if all_elements:
+                metadata["elements"] = all_elements
             if chunk_def.get("is_global_reference"):
                 metadata["is_global_reference"] = True
 
@@ -469,6 +545,13 @@ def main():
             # 保存表格页面图片作为视觉参考
             image_paths = save_table_page_images(pdf, pages, OUT_DIR)
 
+            # 提取页面中的独立图表元素
+            tbl_elements = []
+            for pg_num in pages:
+                page = pdf.pages[pg_num - 1]
+                prefix = f"page_{pg_num:03d}"
+                tbl_elements.extend(extract_page_elements(page, prefix, OUT_DIR))
+
             # 合并内容：先文本段，再Markdown表格
             # （过滤掉表格行中可能重复的表头）
             content = f"### 原始文本\n\n{raw_text}\n\n### 结构化表格\n\n{table_md}"
@@ -491,6 +574,7 @@ def main():
                 "keywords":           chunk_def["keywords"],
                 "related_chunks":     ["DOC-S02", "DOC-S05"],  # 必须关联的说明文档
                 "table_images":       image_paths,
+                "elements":           tbl_elements,
             }
             if chunk_def.get("risk_level"):
                 metadata["risk_level"] = chunk_def["risk_level"]
@@ -532,4 +616,5 @@ def main():
 
 
 if __name__ == "__main__":
+    sys.stdout.reconfigure(encoding="utf-8")
     main()
