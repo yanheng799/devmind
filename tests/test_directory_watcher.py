@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from devmind.data.watchers.directory_watcher import (
+from data.watchers.directory_watcher import (
     DirectoryWatcher,
     MockDirectoryWatcher,
 )

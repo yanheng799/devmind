@@ -1,6 +1,6 @@
 """Model-related modules."""
 
-from devmind.models.base import (
+from models.base import (
     ExtractedEvent,
     HistoricalEvent,
     NewsArticle,
@@ -11,21 +11,21 @@ from models.document import (
     DocumentChunk,
     DocumentSearchResult,
 )
-from devmind.models.market import (
+from models.market import (
     FinancialReport,
     IndustryRelation,
     MarketIndex,
     StockInfo,
     StockPrice,
 )
-from devmind.models.prediction import (
+from models.prediction import (
     PredictionOutcome,
     PredictionResult,
     ReasoningChain,
     ReasoningStep,
     RiskFactor,
 )
-from devmind.models.types import (
+from models.types import (
     Direction,
     EventType,
     Sentiment,

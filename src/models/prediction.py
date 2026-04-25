@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from devmind.models.types import Direction, TimeHorizon
+from models.types import Direction, TimeHorizon
 
 
 class ReasoningStep(BaseModel):

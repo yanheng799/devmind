@@ -62,10 +62,6 @@ class Settings(BaseSettings):
     db_pool_size: int = Field(default=5, ge=1, description="Database connection pool size")
 
     # News collector settings
-    news_sources_config: str = Field(
-        default="config/sources.yaml",
-        description="Path to news sources config file",
-    )
     news_fetch_interval: int = Field(default=300, ge=10, description="News fetch interval in seconds")
     news_max_retries: int = Field(default=3, ge=0, description="Max retries for news fetching")
     news_retry_delay: int = Field(default=5, ge=1, description="Retry delay in seconds")

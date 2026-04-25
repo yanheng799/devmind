@@ -5,8 +5,8 @@ from typing import Any
 
 from openai import OpenAI
 
-from devmind.config import get_settings
-from devmind.models import NewsArticle, Sentiment, SentimentAnalysis
+from config import get_settings
+from models import NewsArticle, Sentiment, SentimentAnalysis
 
 
 class SentimentAnalyzer:

@@ -6,8 +6,8 @@ from typing import Any
 
 from openai import OpenAI
 
-from devmind.config import get_settings
-from devmind.models import ExtractedEvent, EventType, NewsArticle, TimeHorizon
+from config import get_settings
+from models import ExtractedEvent, EventType, NewsArticle, TimeHorizon
 
 
 class EventExtractor:

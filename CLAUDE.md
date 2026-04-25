@@ -6,7 +6,6 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 DevMind 是基于新闻的 A 股股价预测 Agent + 企业级知识问答系统，自用研究辅助工具，本地运行。
 
-- **股票预测**: 新闻采集 → 事件提取 → 情感分析 → 多因子推理 → 价格预测
 - **知识问答**: 文档摄入（PDF/DOCX/MD/网页）→ 分块 → 向量化 → 混合检索 → LLM 生成答案（含图片）
 
 ## 常用命令
@@ -36,9 +35,6 @@ devmind qa-history --session <id>    # 查看会话历史
 devmind qa-delete --session <id>     # 删除会话
 devmind qa-web                       # 启动 Gradio Web UI
 
-# CLI — 股票预测
-devmind --mock predict               # Mock 模式预测
-devmind --verbose fetch              # 抓取新闻
 ```
 
 ## 架构

@@ -59,7 +59,7 @@ Homepage = "https://github.com/devmind/devmind"
 Repository = "https://github.com/devmind/devmind"
 
 [project.scripts]
-devmind = "devmind.cli:main"
+devmind = "cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}

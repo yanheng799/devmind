@@ -4,21 +4,21 @@ import pytest
 from datetime import datetime
 from unittest.mock import Mock, patch
 
-from devmind.data.collectors.base_collector import (
+from data.collectors.base_collector import (
     BaseCollector,
     extract_stock_codes,
     clean_text,
     RateLimitError,
 )
-from devmind.data.collectors.news_collector import (
+from data.collectors.news_collector import (
     EastMoneyNewsCollector,
     MockNewsCollector,
 )
-from devmind.data.collectors.market_collector import (
+from data.collectors.market_collector import (
     MockMarketCollector,
     AkshareMarketCollector,
 )
-from devmind.models import SourceType
+from models import SourceType
 
 
 class TestBaseCollector:

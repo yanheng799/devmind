@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from devmind.data.processors.document_processor import (
+from data.processors.document_processor import (
     DocumentProcessor,
     MockDocumentProcessor,
 )

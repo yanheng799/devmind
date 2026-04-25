@@ -4,7 +4,7 @@ import uuid
 
 import pytest
 
-from devmind.data.vectorstore.document_store import (
+from data.vectorstore.document_store import (
     DocumentVectorStore,
     MockDocumentVectorStore,
 )
