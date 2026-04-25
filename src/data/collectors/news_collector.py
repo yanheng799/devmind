@@ -7,13 +7,13 @@ from urllib.parse import urljoin
 
 from bs4 import BeautifulSoup
 
-from devmind.data.collectors.base_collector import (
+from data.collectors.base_collector import (
     BaseCollector,
     clean_text,
     extract_stock_codes,
     ParseError,
 )
-from devmind.models import NewsArticle, SourceType
+from models import NewsArticle, SourceType
 
 
 class EastMoneyNewsCollector(BaseCollector):

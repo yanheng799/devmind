@@ -4,7 +4,7 @@ import pytest
 from datetime import datetime
 from decimal import Decimal
 
-from devmind.models import (
+from models import (
     Direction,
     EventType,
     ExtractedEvent,

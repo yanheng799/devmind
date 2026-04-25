@@ -20,7 +20,7 @@ from datetime import datetime
 # ─────────────────────────────────────────────
 # 配置
 # ─────────────────────────────────────────────
-PDF_PATH = "E:\\03-汇能博友\\2.351-SA06911S-D0102 第6施工标段塔位明细表.pdf"
+PDF_PATH = "E:\\03-汇能博友\\文档\\2.杆塔明细表.pdf"
 OUT_DIR = Path("/mnt/user-data/outputs/chunks")
 OUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -31,6 +31,9 @@ DRAW_TABLE_BBOXES = True             # 在图片上用彩色矩形标记检测�
 
 # 第1-7页左右分栏设置
 SPLIT_PAGE_RANGE = (1, 7)
+
+# 塔位明细表页面范围（PDF第13-18页）
+TOWER_TABLE_PAGES = list(range(13, 19))
 
 # 图表元素提取设置
 MIN_ELEMENT_WIDTH = 50    # 最小宽度(points)，过滤小图标/LOGO
@@ -531,6 +534,11 @@ def main():
 
         # ── 第二步：切分塔位明细表 ────────────────
         print("\n── 处理塔位明细表分片 ────────────────────")
+
+        # 统一截取所有塔位明细表页面为整页图片（第13-18页）
+        image_paths = save_table_page_images(pdf, TOWER_TABLE_PAGES, OUT_DIR)
+        print(f"  📸 已截取 {len(image_paths)} 张塔位明细表页面图片")
+
         for chunk_def in TABLE_CHUNKS:
             cid = chunk_def["id"]
             pages = chunk_def["pdf_pages"]
@@ -541,9 +549,6 @@ def main():
             # 再提取结构化表格行（转Markdown表格）
             rows = extract_table_rows(pdf, pages)
             table_md = rows_to_markdown(rows)
-
-            # 保存表格页面图片作为视觉参考
-            image_paths = save_table_page_images(pdf, pages, OUT_DIR)
 
             # 提取页面中的独立图表元素
             tbl_elements = []

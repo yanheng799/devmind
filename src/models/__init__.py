@@ -6,7 +6,7 @@ from devmind.models.base import (
     NewsArticle,
     SentimentAnalysis,
 )
-from devmind.models.document import (
+from models.document import (
     Document,
     DocumentChunk,
     DocumentSearchResult,

@@ -7,7 +7,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from devmind.config import get_settings
+from config import get_settings
 
 
 class PredictionDatabase:

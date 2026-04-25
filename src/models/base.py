@@ -5,7 +5,7 @@ from typing import Any
 
 from pydantic import BaseModel, Field, field_validator
 
-from devmind.models.types import Direction, EventType, Sentiment, SourceType, TimeHorizon
+from models.types import Direction, EventType, Sentiment, SourceType, TimeHorizon
 
 
 class NewsArticle(BaseModel):

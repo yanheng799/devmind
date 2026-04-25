@@ -6,7 +6,7 @@ from typing import Any
 
 import akshare as ak
 
-from devmind.models import StockInfo, StockPrice
+from models import StockInfo, StockPrice
 
 
 class MarketCollectorError(Exception):
