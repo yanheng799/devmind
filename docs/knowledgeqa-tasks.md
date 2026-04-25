@@ -29,27 +29,27 @@ Phase 6   #12 集成验证
 
 ### #1 删除死代码和清理项目
 
-**状态**: pending
+**状态**: done ✅ (2025-04-25)
 **前置**: 无
 **产出**: 干净的项目代码库，无死代码，无 import 错误
 
 **步骤**:
 
-| # | 操作 | 文件/目录 |
-|---|------|----------|
-| 1.1 | 删除整个目录 | `src/agents/` |
-| 1.2 | 删除整个目录 | `src/split/` |
-| 1.3 | 删除整个目录 | `src/rag/` |
-| 1.4 | 删除整个目录 | `src/utils/` |
-| 1.5 | 删除测试脚本 | `tests/split_document.py` |
-| 1.6 | 删除测试脚本 | `tests/split_document_v2.py` |
-| 1.7 | 删除测试脚本 | `tests/embedding.py` |
-| 1.8 | 删除测试脚本 | `tests/milvus_study.py` |
-| 1.9 | 修复 import | `src/models/__init__.py`: `from models.document` → `from devmind.models.document` |
-| 1.10 | 修复 import | `src/models/base.py`: `from models.types` → `from devmind.models.types` |
-| 1.11 | 删除无效 import | `src/cli.py`: 删除 `from devmind.agents.stock_agent import StockPredictionAgent` 及相关引用 |
-| 1.12 | 删除无效字段 | `src/config/settings.py`: 删除 `news_sources_config` 字段 |
-| 1.13 | 验证 | `pytest tests/test_models.py -v` 确保现有测试通过 |
+| # | 操作 | 文件/目录 | 状态 |
+|---|------|----------|------|
+| 1.1 | 删除整个目录 | `src/agents/` | ✅ |
+| 1.2 | 删除整个目录 | `src/split/` | ✅ |
+| 1.3 | 删除整个目录 | `src/rag/` | ✅ |
+| 1.4 | 删除整个目录 | `src/utils/` | ✅ |
+| 1.5 | 删除测试脚本 | `tests/split_document.py` | ✅ |
+| 1.6 | 删除测试脚本 | `tests/split_document_v2.py` | ✅ |
+| 1.7 | 删除测试脚本 | `tests/embedding.py` | ✅ |
+| 1.8 | 删除测试脚本 | `tests/milvus_study.py` | ✅ |
+| 1.9 | 统一 import 为扁平结构 | 全部 16 个文件移除 `devmind.` 前缀（注：原计划方向有误，实际代码已在 `src/` 扁平结构下） | ✅ |
+| 1.10 | 修复 `pyproject.toml` 入口点 | `devmind.cli:main` → `cli:main` | ✅ |
+| 1.11 | 清理 CLI | 删除 `StockPredictionAgent` 及 5 个依赖命令（predict/fetch/query/history/accuracy），保留文档管理命令 | ✅ |
+| 1.12 | 删除无效字段 | `src/config/settings.py`: 删除 `news_sources_config` 字段 | ✅ |
+| 1.13 | 验证 | `pytest tests/test_models.py -v` — 13 passed | ✅ |
 
 ---
 
